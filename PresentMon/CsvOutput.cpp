@@ -85,6 +85,11 @@ static void WriteCsvHeader(FILE* fp)
     if (args.mOutputQpcTime) {
         fprintf(fp, ",QPCTime");
     }
+
+    // Output MLSD prediction results
+    // In addition to output the predicted category, also log the results of each category in different columns so that we can visualize them easily in Excel.  
+    fprintf(fp, ",MLSD-Predicted-Category,MLSD-NotReady,MLSD-Okay,MLSD-Stutter");
+
     fprintf(fp, "\n");
 }
 
@@ -158,6 +163,19 @@ void UpdateCsv(ProcessInfo* processInfo, SwapChainData const& chain, PresentEven
             fprintf(fp, ",%llu", p.QpcTime);
         }
     }
+
+    // Output MLSD Results 
+    STUTTER_EXPERIENCE ExperiencePrediction = MLGetStutterExperiencePrediction();
+    if (ExperiencePrediction == STUTTER_EXPERIENCE::NOT_READY) {
+        fprintf(fp, ",NOT_READY,%.3lf,#N/A,#N/A", 1000.0 / msBetweenPresents);
+    }
+    else if (ExperiencePrediction == STUTTER_EXPERIENCE::GOOD) {
+        fprintf(fp, ",GOOD,#N/A,%.3lf,#N/A", 1000.0 / msBetweenPresents);
+    }
+    else if (ExperiencePrediction == STUTTER_EXPERIENCE::BAD) {
+        fprintf(fp, ",BAD,#N/A,#N/A,%.3lf", 1000.0 / msBetweenPresents);
+    }
+
     fprintf(fp, "\n");
 }
 

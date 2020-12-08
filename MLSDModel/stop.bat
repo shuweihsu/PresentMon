@@ -1,0 +1,1 @@
+c:\WPTInternal\xperf -stop PresentMon

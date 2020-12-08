@@ -38,7 +38,7 @@
     <ProjectGuid>{0f60dfd9-208e-443e-8d01-43c902b458a6}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>PresentMonTests</RootNamespace>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.19041.0</WindowsTargetPlatformVersion>
     <WindowsTargetPlatformVersion Condition="'$(Platform)'=='ARM'">10.0</WindowsTargetPlatformVersion>
     <WindowsTargetPlatformVersion Condition="'$(Platform)'=='ARM64'">10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>

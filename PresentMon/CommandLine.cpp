@@ -331,6 +331,10 @@ static void PrintHelp()
         "-terminate_existing",      "Terminate any existing PresentMon realtime trace sessions, then exit."
                                     " Use with -session_name to target particular sessions.",
         "-include_mixed_reality",   "Capture Windows Mixed Reality data to a CSV file with \"_WMR\" suffix.",
+
+        "-mlsd_moving_average_size","Set moving averaged window size for calculate FPS, which will be used"
+                                    "as inputs for FPS experience prediction.",
+        "-mlsd_show_overlay",       "Show or disable the stutter overlay on the target process.",        
     };
 
     fprintf(stderr, "PresentMon %s\n", PRESENT_MON_VERSION);
@@ -411,6 +415,8 @@ bool ParseCommandLine(int argc, char** argv)
     args->mIncludeWindowsMixedReality = false;
     args->mMultiCsv = false;
     args->mStopExistingSession = false;
+    args->mMLMovingAverageSize = 2;
+    args->mMLShowOverlay = 1;
 
     bool simple = false;
     bool verbose = false;
@@ -450,6 +456,10 @@ bool ParseCommandLine(int argc, char** argv)
         else if (ParseArg(argv[i], "qpc_time_s"))            { args->mOutputQpcTimeInSeconds     = true; continue; }
         else if (ParseArg(argv[i], "terminate_existing"))    { args->mTerminateExisting          = true; continue; }
         else if (ParseArg(argv[i], "include_mixed_reality")) { args->mIncludeWindowsMixedReality = true; continue; }
+
+        // MLSD options:
+        else if (ParseArg(argv[i], "mlsd_moving_average_size")) { if (ParseValue(argv, argc, &i, &args->mMLMovingAverageSize)) continue; }
+        else if (ParseArg(argv[i], "mlsd_show_overlay"))        { if (ParseValue(argv, argc, &i, &args->mMLShowOverlay))       continue; }
 
         // Provided argument wasn't recognized
         else if (!(ParseArg(argv[i], "?") || ParseArg(argv[i], "h") || ParseArg(argv[i], "help"))) {

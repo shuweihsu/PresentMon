@@ -10,6 +10,8 @@
     <ClCompile Include="OutputThread.cpp" />
     <ClCompile Include="Privilege.cpp" />
     <ClCompile Include="TraceSession.cpp" />
+    <ClCompile Include="MLOutput.cpp" />
+    <ClCompile Include="MLOverlayThread.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="LateStageReprojectionData.hpp" />
@@ -17,6 +19,7 @@
     <ClInclude Include="..\build\obj\generated\version.h">
       <Filter>generated</Filter>
     </ClInclude>
+    <ClInclude Include="MLOutput.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="generated">

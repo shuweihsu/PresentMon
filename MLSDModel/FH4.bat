@@ -1,0 +1,1 @@
+PresentMon-dev-x64.exe  -process_name ForzaHorizon4.exe -mlsd_moving_average_size 2 -mlsd_show_overlay 0

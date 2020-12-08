@@ -276,6 +276,11 @@ static void AddPresents(std::vector<std::shared_ptr<PresentEvent>> const& presen
             chain->mLastDisplayedPresentIndex = 0;
         }
 
+        // Update frame-time history and make a MLSD prediction
+        if (recording) {
+            MLUpdateInputAndPredict(processInfo, *chain, *presentEvent);
+        }
+
         // Output CSV row if recording (need to do this before updating chain).
         if (recording) {
             UpdateCsv(processInfo, *chain, *presentEvent);
@@ -500,6 +505,9 @@ void Output()
     auto const& args = GetCommandLineArgs();
 #endif
 
+    // Initialize MLSD
+    MLInitialize();
+
     // Structures to track processes and statistics from recorded events.
     LateStageReprojectionData lsrData;
     std::vector<ProcessEvent> processEvents;
@@ -550,6 +558,12 @@ void Output()
             if (realtimeRecording) {
                 ConsolePrintLn("** RECORDING **");
             }
+
+            // Update consolue to include MLSD results
+            if (realtimeRecording) {
+                MLUpdateConsole();
+            }
+                        
             CommitConsole();
             break;
         }
@@ -590,6 +604,9 @@ void Output()
     gProcesses.clear();
     CloseOutputCsv(nullptr); // Special case to close single global CSV if not
                              // using per-process CSVs.
+
+    // Cleanup MLSD
+    MLCleanup();
 }
 
 void StartOutputThread()

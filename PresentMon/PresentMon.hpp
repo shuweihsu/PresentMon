@@ -73,6 +73,8 @@ struct CommandLineArgs {
     UINT mTimer;
     UINT mHotkeyModifiers;
     UINT mHotkeyVirtualKeyCode;
+    UINT mMLMovingAverageSize;
+    UINT mMLShowOverlay;
     ConsoleOutput mConsoleOutputType;
     Verbosity mVerbosity;
     bool mOutputCsvToFile;
@@ -118,6 +120,7 @@ struct ProcessInfo {
 };
 
 #include "LateStageReprojectionData.hpp"
+#include "MLOutput.hpp"
 
 // CommandLine.cpp:
 bool ParseCommandLine(int argc, char** argv);
@@ -150,6 +153,10 @@ void ExitMainThread();
 void StartOutputThread();
 void StopOutputThread();
 void SetOutputRecordingState(bool record);
+
+// MLOverlayThread.cpp:
+void StartMLOverlayThread();
+void StopMLOverlayThread();
 
 // Privilege.cpp:
 void ElevatePrivilege(int argc, char** argv);

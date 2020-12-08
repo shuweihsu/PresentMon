@@ -109,6 +109,11 @@ bool StartTraceSession()
     StartConsumerThread(gSession.mTraceHandle);
     StartOutputThread();
 
+    // Start MLSD overlay thread
+    // TODO:: Disable overlay based on input arg
+    //if(args.mMLShowOverlay==1) StartMLOverlayThread();
+    StartMLOverlayThread();
+
     return true;
 }
 
@@ -121,6 +126,9 @@ void StopTraceSession()
     // consumers).
     WaitForConsumerThreadToExit();
     StopOutputThread();
+
+    // Stop MLSD overlay thread
+    StopMLOverlayThread();
 
     // Destruct the consumers
     delete gMRConsumer;
