@@ -159,7 +159,8 @@ void StartMLOverlayThread();
 void StopMLOverlayThread();
 
 // Privilege.cpp:
-void ElevatePrivilege(int argc, char** argv);
+bool EnableDebugPrivilege();
+int RestartAsAdministrator(int argc, char** argv);
 
 // TraceSession.cpp:
 bool StartTraceSession();
@@ -168,6 +169,7 @@ void CheckLostReports(ULONG* eventsLost, ULONG* buffersLost);
 void DequeueAnalyzedInfo(
     std::vector<ProcessEvent>* processEvents,
     std::vector<std::shared_ptr<PresentEvent>>* presentEvents,
+    std::vector<std::shared_ptr<PresentEvent>>* lostPresentEvents,
     std::vector<std::shared_ptr<LateStageReprojectionEvent>>* lsrs);
 double QpcDeltaToSeconds(uint64_t qpcDelta);
 uint64_t SecondsDeltaToQpc(double secondsDelta);

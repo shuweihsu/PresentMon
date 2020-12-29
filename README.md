@@ -93,7 +93,7 @@ Execution options:
                            isn't required to trace a process you started, but
                            PresentMon requires elevated privilege in order to
                            query processes started on another account. Without
-                           it, these processes cannot be targetted by name and
+                           it, these processes cannot be targeted by name and
                            will be listed as '<error>'.
   -terminate_on_proc_exit  Terminate PresentMon when all the target processes
                            have exited.

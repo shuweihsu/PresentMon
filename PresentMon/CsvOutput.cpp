@@ -146,7 +146,7 @@ void UpdateCsv(ProcessInfo* processInfo, SwapChainData const& chain, PresentEven
         fprintf(fp, ",%d,%s", p.SupportsTearing, PresentModeToString(p.PresentMode));
     }
     if (args.mVerbosity >= Verbosity::Verbose) {
-        fprintf(fp, ",%d,%d", p.WasBatched, p.DwmNotified);
+        fprintf(fp, ",%d,%d", (p.DriverBatchThreadId != 0), p.DwmNotified);
     }
     fprintf(fp, ",%s,%.6lf,%.3lf", FinalStateToDroppedString(p.FinalState), timeInSeconds, msBetweenPresents);
     if (args.mVerbosity > Verbosity::Simple) {

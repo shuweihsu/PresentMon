@@ -19,134 +19,112 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <shellapi.h>
+#include <stdio.h>
 
-#include "PresentMon.hpp"
-
-namespace {
-
-typedef BOOL(WINAPI *OpenProcessTokenProc)(HANDLE ProcessHandle, DWORD DesiredAccess, PHANDLE TokenHandle);
-typedef BOOL(WINAPI *GetTokenInformationProc)(HANDLE TokenHandle, TOKEN_INFORMATION_CLASS TokenInformationClass, LPVOID TokenInformation, DWORD TokenInformationLength, DWORD *ReturnLength);
-typedef BOOL(WINAPI *LookupPrivilegeValueAProc)(LPCSTR lpSystemName, LPCSTR lpName, PLUID lpLuid);
-typedef BOOL(WINAPI *AdjustTokenPrivilegesProc)(HANDLE TokenHandle, BOOL DisableAllPrivileges, PTOKEN_PRIVILEGES NewState, DWORD BufferLength, PTOKEN_PRIVILEGES PreviousState, PDWORD ReturnLength);
-
-struct Advapi {
-    HMODULE HModule;
-    OpenProcessTokenProc OpenProcessToken;
-    GetTokenInformationProc GetTokenInformation;
-    LookupPrivilegeValueAProc LookupPrivilegeValueA;
-    AdjustTokenPrivilegesProc AdjustTokenPrivileges;
-
-    Advapi()
-        : HModule(NULL)
-    {
+bool EnableDebugPrivilege()
+{
+    auto hmodule = LoadLibraryA("advapi32.dll");
+    auto pOpenProcessToken      = (decltype(&OpenProcessToken))      GetProcAddress(hmodule, "OpenProcessToken");
+    auto pGetTokenInformation   = (decltype(&GetTokenInformation))   GetProcAddress(hmodule, "GetTokenInformation");
+    auto pLookupPrivilegeValue  = (decltype(&LookupPrivilegeValueA)) GetProcAddress(hmodule, "LookupPrivilegeValueA");
+    auto pAdjustTokenPrivileges = (decltype(&AdjustTokenPrivileges)) GetProcAddress(hmodule, "AdjustTokenPrivileges");
+    if (pOpenProcessToken      == nullptr ||
+        pGetTokenInformation   == nullptr ||
+        pLookupPrivilegeValue  == nullptr ||
+        pAdjustTokenPrivileges == nullptr) {
+        FreeLibrary(hmodule);
+        return false;
     }
 
-    ~Advapi()
-    {
-        if (HModule != NULL) {
-            FreeLibrary(HModule);
-        }
+    HANDLE hToken = NULL;
+    if (pOpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, &hToken) == 0) {
+        FreeLibrary(hmodule);
+        return false;
     }
 
-    bool Load()
-    {
-        HModule = LoadLibraryA("advapi32.dll");
-        if (HModule == NULL) {
-            return false;
-        }
+    // Try to enable required privilege
+    TOKEN_PRIVILEGES tp = {};
+    tp.PrivilegeCount = 1;
+    tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
 
-        OpenProcessToken = (OpenProcessTokenProc) GetProcAddress(HModule, "OpenProcessToken");
-        GetTokenInformation = (GetTokenInformationProc) GetProcAddress(HModule, "GetTokenInformation");
-        LookupPrivilegeValueA = (LookupPrivilegeValueAProc) GetProcAddress(HModule, "LookupPrivilegeValueA");
-        AdjustTokenPrivileges = (AdjustTokenPrivilegesProc) GetProcAddress(HModule, "AdjustTokenPrivileges");
-
-        if (OpenProcessToken == nullptr ||
-            GetTokenInformation == nullptr ||
-            LookupPrivilegeValueA == nullptr ||
-            AdjustTokenPrivileges == nullptr) {
-            FreeLibrary(HModule);
-            HModule = NULL;
-            return false;
-        }
-
-        return true;
-    }
-
-    bool HasElevatedPrivilege() const
-    {
-        HANDLE hToken = NULL;
-        if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken)) {
-            return false;
-        }
-
-        /** BEGIN WORKAROUND: struct TOKEN_ELEVATION and enum value TokenElevation
-         * are not defined in the vs2003 headers, so we reproduce them here. **/
-        enum { WA_TokenElevation = 20 };
-        DWORD TokenIsElevated = 0;
-        /** END WA **/
-
-        DWORD dwSize = 0;
-        if (!GetTokenInformation(hToken, (TOKEN_INFORMATION_CLASS) WA_TokenElevation, &TokenIsElevated, sizeof(TokenIsElevated), &dwSize)) {
-            TokenIsElevated = 0;
-        }
-
+    if (pLookupPrivilegeValue(NULL, "SeDebugPrivilege", &tp.Privileges[0].Luid) == 0) {
         CloseHandle(hToken);
-
-        return TokenIsElevated != 0;
+        FreeLibrary(hmodule);
+        return false;
     }
 
-    bool EnableDebugPrivilege() const
-    {
-        HANDLE hToken = NULL;
-        if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, &hToken)) {
-            return false;
-        }
+    auto adjustResult = pAdjustTokenPrivileges(hToken, FALSE, &tp, sizeof(TOKEN_PRIVILEGES), nullptr, nullptr);
+    auto adjustError = GetLastError();
 
-        TOKEN_PRIVILEGES tp = {};
-        tp.PrivilegeCount = 1;
-        tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+    CloseHandle(hToken);
+    FreeLibrary(hmodule);
 
-        bool enabled =
-            LookupPrivilegeValueA(NULL, "SeDebugPrivilege", &tp.Privileges[0].Luid) &&
-            AdjustTokenPrivileges(hToken, FALSE, &tp, sizeof(TOKEN_PRIVILEGES), nullptr, nullptr) &&
-            GetLastError() != ERROR_NOT_ALL_ASSIGNED;
-
-        CloseHandle(hToken);
-
-        return enabled;
-    }
-};
+    return
+        adjustResult != 0 &&
+        adjustError != ERROR_NOT_ALL_ASSIGNED;
+}
 
 int RestartAsAdministrator(
     int argc,
     char** argv)
 {
+    // Get the exe path
     char exe_path[MAX_PATH] = {};
     GetModuleFileNameA(NULL, exe_path, sizeof(exe_path));
 
-    // Combine arguments into single array
-    char args[1024] = {};
-    for (int idx = 0, i = 1; i < argc && (size_t) idx < sizeof(args); ++i) {
-        if (idx >= sizeof(args)) {
-            fprintf(stderr, "internal error: command line arguments too long.\n");
-            return false; // was truncated
+    // Combine arguments into single char* and add -dont_restart_as_admin to
+    // prevent an endless loop if the escalation fails.
+    char* args = nullptr;
+    {
+        static char const* const extra_args = "-dont_restart_as_admin";
+        size_t idx = strlen(extra_args);
+        size_t len = idx + 1;
+        for (int i = 1; i < argc; ++i) {
+            len += strlen(argv[i]) + 2 + 1; // +2 for possible quotes, +1 for space or null
         }
 
-        if (argv[i][0] != '\"' && strchr(argv[i], ' ')) {
-            idx += snprintf(args + idx, sizeof(args) - idx, " \"%s\"", argv[i]);
-        } else {
-            idx += snprintf(args + idx, sizeof(args) - idx, " %s", argv[i]);
+        args = new char [len];
+        memcpy(args, extra_args, idx + 1);
+        for (int i = 1; i < argc; ++i) {
+            auto addQuotes = argv[i][0] != '\"' && strchr(argv[i], ' ') != nullptr;
+            auto n = strlen(argv[i]);
+
+            args[idx] = ' ';
+
+            if (addQuotes) {
+                args[idx + 1] = '\"';
+                memcpy(args + idx + 2, argv[i], n);
+                args[idx + n + 2] = '\"';
+                args[idx + n + 3] = '\0';
+                idx += 2;
+            } else {
+                memcpy(args + idx + 1, argv[i], n + 1);
+            }
+
+            idx += n + 1;
         }
     }
 
+    // Re-run the process with the runas verb
+    DWORD code = 2;
+
     SHELLEXECUTEINFOA info = {};
     info.cbSize       = sizeof(info);
-    info.fMask        = SEE_MASK_NOCLOSEPROCESS;
+    info.fMask        = SEE_MASK_NOCLOSEPROCESS; // return info.hProcess for explicit wait
     info.lpVerb       = "runas";
     info.lpFile       = exe_path;
     info.lpParameters = args;
-    info.nShow        = SW_SHOW;
-    if (!ShellExecuteExA(&info) || info.hProcess == NULL) {
+    info.nShow        = SW_SHOWDEFAULT;
+    auto ok = ShellExecuteExA(&info);
+    delete[] args;
+    if (ok) {
+        WaitForSingleObject(info.hProcess, INFINITE);
+        GetExitCodeProcess(info.hProcess, &code);
+        CloseHandle(info.hProcess);
+    } else {
         fprintf(stderr, "error: failed to elevate privilege ");
         int e = GetLastError();
         switch (e) {
@@ -159,51 +137,8 @@ int RestartAsAdministrator(
         case ERROR_SHARING_VIOLATION: fprintf(stderr, "(sharing violation).\n"); break;
         default:                      fprintf(stderr, "(%u).\n", e); break;
         }
-        return 2;
     }
-
-    WaitForSingleObject(info.hProcess, INFINITE);
-
-    DWORD code = 0;
-    GetExitCodeProcess(info.hProcess, &code);
-    int e = GetLastError();
-    (void) e;
-    CloseHandle(info.hProcess);
 
     return code;
-}
-
-}
-
-// Returning from this function means keep running in this process.
-void ElevatePrivilege(int argc, char** argv)
-{
-    auto const& args = GetCommandLineArgs();
-
-    // If we are processing an ETL file, then we don't need elevated privilege
-    if (args.mEtlFileName != nullptr) {
-        return;
-    }
-
-    // Try to load advapi to check and set required privilege.
-    Advapi advapi;
-    if (advapi.Load() && advapi.EnableDebugPrivilege()) {
-        return;
-    }
-
-    // If user requested to run anyway, warn about potential issues.
-    if (!args.mTryToElevate) {
-        fprintf(stderr,
-            "warning: PresentMon requires elevated privilege in order to query processes\n"
-            "    started on another account.  Without elevation, these processes can't be\n"
-            "    targetted by name and will be listed as '<error>'.\n");
-        if (args.mTerminateOnProcExit && args.mTargetPid == 0) {
-            fprintf(stderr, "    -terminate_on_proc_exit will also not work.\n");
-        }
-        return;
-    }
-
-    // Try to restart PresentMon with admin privileve
-    exit(RestartAsAdministrator(argc, argv));
 }
 

@@ -217,11 +217,26 @@ int main(int argc, char** argv)
 
     // Attempt to elevate process privilege if necessary.
     //
-    // If a new process needs to be started, this will wait for the elevated
-    // process to complete in order to report stderr and exit code, and then
-    // abort from within ElevatePrivilege() (i.e., the rest of this function
-    // won't run in this process).
-    ElevatePrivilege(argc, argv);
+    // If we are processing an ETL file we don't need elevated privilege, but
+    // for realtime analysis we need SeDebugPrivilege in order to open handles
+    // to processes started by other accounts (see OutputThread.cpp).
+    // 
+    // If we can't enable SeDebugPrivilege, try to restart PresentMon as
+    // administrator unless the user requested not to.
+    // 
+    // RestartAsAdministrator() waits for the elevated process to complete in
+    // order to report stderr and obtain it's exit code.
+    if (args.mEtlFileName == nullptr && // realtime analysis
+        !EnableDebugPrivilege()) {      // failed to enable SeDebugPrivilege
+        if (args.mTryToElevate) {
+            return RestartAsAdministrator(argc, argv);
+        }
+
+        fprintf(stderr,
+            "warning: PresentMon requires elevated privilege in order to query processes started\n"
+            "    on another account.  Without it, those processes will be listed as '<error>'\n"
+            "    and they can't be targeted by -process_name nor trigger -terminate_on_proc_exit.\n");
+    }
 
     // Create a message queue to handle the input messages.
     WNDCLASSEXW wndClass = { sizeof(wndClass) };

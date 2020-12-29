@@ -19,7 +19,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-
 #pragma once
 
 #define DEBUG_VERBOSE 0
@@ -41,6 +40,7 @@ void DebugEvent(_EVENT_RECORD* eventRecord, EventMetadata* metadata);
 void DebugCreatePresent(PresentEvent const& p);
 void DebugModifyPresent(PresentEvent const& p);
 void DebugCompletePresent(PresentEvent const& p, int indent);
+void DebugLostPresent(PresentEvent const& p);
 
 #else
 
@@ -50,5 +50,6 @@ void DebugCompletePresent(PresentEvent const& p, int indent);
 #define DebugCreatePresent(p)                               (void) p
 #define DebugModifyPresent(p)                               (void) p
 #define DebugCompletePresent(p, indent)                     (void) p, indent
+#define DebugLostPresent(p)                                 (void) p
 
 #endif

@@ -27,6 +27,7 @@
       <Message>Generating version sources for $(PresentMonVersion)</Message>
       <Command>$(MsBuildThisFileDirectory)Tools\generate_version_sources.cmd $(PresentMonVersion) $(MsBuildThisFileDirectory)build\obj\generated\version.h</Command>
       <Outputs>$(MsBuildThisFileDirectory)build\obj\generated\version.h</Outputs>
+      <Inputs>$(MsBuildThisFileDirectory)PresentMon.props</Inputs>
       <TreatOutputAsContent>false</TreatOutputAsContent>
     </CustomBuildStep>
   </ItemDefinitionGroup>

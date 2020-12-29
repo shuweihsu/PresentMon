@@ -321,7 +321,7 @@ static void PrintHelp()
         "-dont_restart_as_admin",   "Don't try to elevate privilege.  Elevated privilege isn't required"
                                     " to trace a process you started, but PresentMon requires elevated"
                                     " privilege in order to query processes started on another account."
-                                    " Without it, these processes cannot be targetted by name and will be"
+                                    " Without it, these processes cannot be targeted by name and will be"
                                     " listed as '<error>'.",
         "-terminate_on_proc_exit",  "Terminate PresentMon when all the target processes have exited.",
         "-terminate_after_timed",   "When using -timed, terminate PresentMon after the timed capture completes.",
