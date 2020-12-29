@@ -485,38 +485,50 @@ void MLUpdateInputAndPredict(ProcessInfo* processInfo, SwapChainData const& chai
 
     gMLInputData.push_back(gMovingAverageProcessor.next(frametimeMSNorm));
 
-    if (gMLInputData.size() == ML_INPUT_SIZE) {
-        // Bind input
-        std::vector<int64_t> inputShape({ 1, ML_INPUT_SIZE, 1 });
-        gMLBinding.Bind(L"conv1d_1_input", TensorFloat::CreateFromIterable(inputShape, gMLInputData));
+    static auto beginTime = std::chrono::steady_clock::now();
 
-        // Run the model
-        auto optionalCorrelationId = L"";
-        auto results = gMLSession.Evaluate(gMLBinding, optionalCorrelationId);
+    auto currentTime = std::chrono::steady_clock::now();
+    std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double>>(currentTime - beginTime);
 
-        // Get the prediction result
-        auto resultTensor = results.Outputs().Lookup(L"output").as<TensorFloat>();
-        gMLResult = resultTensor.GetAsVectorView();
-
-        // Store prediction result
-        gMLExperience.push_back(MLGetStutterExperiencePrediction());
-
-        // Make some room for the following inputs. We will do the prediction once the input is full again. 
-        gMLInputData.erase(gMLInputData.begin(), gMLInputData.begin() + 20);
-    }
+    if (time_span.count() < 1.0) return;
     else {
-        gMLExperience.push_back(STUTTER_EXPERIENCE::NO_PREDICT);
+
+        if (gMLInputData.size() < 10) {
+            gMLExperience.push_back(STUTTER_EXPERIENCE::NO_PREDICT);
+        }
+        else {
+            // Bind input
+            std::vector<int64_t> inputShape({ 1, ML_INPUT_SIZE, 1 });
+            gMLBinding.Bind(L"conv1d_1_input", TensorFloat::CreateFromIterable(inputShape, gMLInputData));
+
+            // Run the model
+            auto optionalCorrelationId = L"";
+            auto results = gMLSession.Evaluate(gMLBinding, optionalCorrelationId);
+
+            // Get the prediction result
+            auto resultTensor = results.Outputs().Lookup(L"output").as<TensorFloat>();
+            gMLResult = resultTensor.GetAsVectorView();
+
+            // Store prediction result
+            gMLExperience.push_back(MLGetStutterExperiencePrediction());
+        }
+
+        // erase all inputs
+        gMLInputData.erase(gMLInputData.begin(), gMLInputData.end());
+
+        // Remove old entries in experience queue
+        if (gMLExperience.size() == 60) {
+            gMLExperience.erase(gMLExperience.begin());
+        }
+
+        beginTime = currentTime;
     }
 
-	// Remove old entries in experience queue
-    if (gMLExperience.size() == ML_INPUT_SIZE) {
-        gMLExperience.erase(gMLExperience.begin());
-    }
 }
 
 void MLUpdateConsole() {
     // get the latest 100 prediction 
-    const int maxPredictionHistory = 100;
+    const int maxPredictionHistory = 60;
     string buffer(maxPredictionHistory, ' ');
     vector<int>::reverse_iterator ritr = gMLExperience.rbegin();
 
