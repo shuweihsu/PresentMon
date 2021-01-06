@@ -5,7 +5,6 @@ using namespace winrt::Windows::AI::MachineLearning;
 using namespace std;
 
 constexpr auto ML_INPUT_AVG_WINDOW_SIZE = 2; // Default is 2. Might be changed through cmd parameters. 
-constexpr auto ML_INPUT_SIZE = 256;          // Should be the same as the FPS_HISTORY_SIZE in the model training script.
 constexpr auto ML_FRAME_CAP = 500;           // Should be the same as the FPS_MAX value in the model training script.
 constexpr auto ML_FRAME_TIME_CAP = 200;      // Should be the same as the FRAME_TIME_MAX value in the model training script.
 
@@ -498,7 +497,8 @@ void MLUpdateInputAndPredict(ProcessInfo* processInfo, SwapChainData const& chai
         }
         else {
             // Bind input
-            std::vector<int64_t> inputShape({ 1, ML_INPUT_SIZE, 1 });
+            int64_t input_size = gMLInputData.size();
+            std::vector<int64_t> inputShape({ 1, input_size, 1 });
             gMLBinding.Bind(L"conv1d_1_input", TensorFloat::CreateFromIterable(inputShape, gMLInputData));
 
             // Run the model
