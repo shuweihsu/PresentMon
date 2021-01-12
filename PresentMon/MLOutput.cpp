@@ -1,7 +1,11 @@
 ﻿#include "PresentMon.hpp"
 #include "MLOutput.hpp"
+#include "MLSDModel.h"  // This file is expected to pull from other place.
 
 using namespace winrt::Windows::AI::MachineLearning;
+using namespace winrt::Windows::Storage::Streams;
+using namespace winrt::Windows::Storage;
+
 using namespace std;
 
 constexpr auto ML_INPUT_AVG_WINDOW_SIZE = 2; // Default is 2. Might be changed through cmd parameters. 
@@ -46,7 +50,6 @@ winrt::Windows::Foundation::Collections::IVectorView<float> gMLResult = nullptr;
 OverlayPanel* gOverlayPanel = nullptr;
 std::wstring gTargeteProcessWindowTitle;
 std::wstring modelName = L"MLSD.onnx";
-
 
 
 // Find process utility
@@ -404,8 +407,23 @@ bool MLInitialize() {
     // Get model path
     auto modelPath = GetModelPath();
 
-    // load the model
-    gMLModel = LearningModel::LoadFromFilePath(modelPath);
+    // load the model from onnx file
+    // gMLModel = LearningModel::LoadFromFilePath(modelPath);
+
+    // load the model from header
+    const size_t size = sizeof(modelData);
+    // write the bytes into a stream
+    winrt::Windows::Storage::Streams::InMemoryRandomAccessStream modelStream;
+    winrt::Windows::Storage::Streams::DataWriter writer(modelStream);
+    writer.WriteBytes(winrt::array_view<const unsigned char>(modelData, modelData + size));
+    writer.StoreAsync().get();
+
+    // wrap the stream in a stream reference
+    auto modelStreamReference = winrt::Windows::Storage::Streams::RandomAccessStreamReference::CreateFromStream(modelStream);
+
+    // load the model from stream reference
+    gMLModel = LearningModel::LoadFromStream(modelStreamReference);
+
 
     // now create a session and binding
     gMLSession = LearningModelSession(gMLModel, LearningModelDevice(LearningModelDeviceKind::Default));
@@ -472,12 +490,22 @@ void MLUpdateInputAndPredict(ProcessInfo* processInfo, SwapChainData const& chai
 
     // Look up the last present event in the swapchain's history.  We need at
     // least two presents to compute frame statistics.
+
     if (chain.mPresentHistoryCount == 0) {
         return;
     }
-
     auto lastPresented = chain.mPresentHistory[(chain.mNextPresentIndex - 1) % SwapChainData::PRESENT_HISTORY_MAX_COUNT].get();
     float frametimeMS =  1000 * static_cast<float>(QpcDeltaToSeconds(p.QpcTime - lastPresented->QpcTime));
+
+
+    // [Test] use displayed time instead of render time
+    /*
+    if (chain.mLastDisplayedPresentIndex <= 0) {
+        return;
+    }
+    auto lastDisplayed = chain.mPresentHistory[chain.mLastDisplayedPresentIndex % SwapChainData::PRESENT_HISTORY_MAX_COUNT].get();
+    float frametimeMS = 1000 * static_cast<float>(QpcDeltaToSeconds(p.ScreenTime - lastDisplayed->ScreenTime));
+    */
 
     // Cap frame time to ML_FRAME_TIME_CAP and then normalize it to [0,1]
     float frametimeMSNorm =  max(0.0f, min(1.0f, frametimeMS / ML_FRAME_TIME_CAP));
@@ -498,6 +526,7 @@ void MLUpdateInputAndPredict(ProcessInfo* processInfo, SwapChainData const& chai
         else {
             // Bind input
             int64_t input_size = gMLInputData.size();
+
             std::vector<int64_t> inputShape({ 1, input_size, 1 });
             gMLBinding.Bind(L"conv1d_1_input", TensorFloat::CreateFromIterable(inputShape, gMLInputData));
 
@@ -514,7 +543,7 @@ void MLUpdateInputAndPredict(ProcessInfo* processInfo, SwapChainData const& chai
         }
 
         // erase all inputs
-        gMLInputData.erase(gMLInputData.begin(), gMLInputData.end());
+        gMLInputData.clear();
 
         // Remove old entries in experience queue
         if (gMLExperience.size() == 60) {
@@ -555,7 +584,6 @@ void MLUpdateConsole() {
         if (i == STUTTER_EXPERIENCE::GOOD) goodExpCnt++;
         else if (i == STUTTER_EXPERIENCE::BAD) badExpCnt++;
     }
-
     ConsolePrintLn("%s", string(100, '-').c_str());
     ConsolePrintLn("%s", buffer.data());
     ConsolePrintLn("%s", string(100, '-').c_str());

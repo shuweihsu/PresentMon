@@ -15,6 +15,7 @@
 #include <winrt/Windows.AI.MachineLearning.h>
 #include <winrt/Windows.Media.h>
 #include <winrt/Windows.Storage.h>
+#include <winrt/Windows.Storage.Streams.h>
 #include <winrt/Windows.Graphics.h>
 #include <winrt/Windows.Graphics.Imaging.h>
 #include <wrl/client.h>
